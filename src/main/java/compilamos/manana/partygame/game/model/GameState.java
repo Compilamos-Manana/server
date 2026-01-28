@@ -1,0 +1,13 @@
+package compilamos.manana.partygame.game.model;
+
+public enum GameState {
+    LOBBY,
+    SUBMISSION_OPEN,
+    SUBMISSION_CLOSED,
+    PLAYBACK_SENTENCE_ACTIVE,
+    PLAYBACK_SENTENCE_RESOLVING,
+    HOST_RECONNECTING,
+    GAME_END_WINNER,
+    GAME_END_NO_WINNER,
+    GAME_END_HOST_DISCONNECTED
+}
