@@ -1,20 +1,25 @@
 package compilamos.manana.partygame.api.controller;
 
-import compilamos.manana.partygame.game.model.question.Question;
 import compilamos.manana.partygame.game.model.question.QuestionSet;
 import compilamos.manana.partygame.game.model.question.RoundQuestions;
+import compilamos.manana.partygame.game.question.dtos.QuestionSetNameDTO;
+import compilamos.manana.partygame.game.question.service.QuestionService;
 import io.swagger.v3.oas.annotations.Operation;
+import org.springframework.http.HttpEntity;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
 @RestController
 @RequestMapping("/question")
 public class QuestionController {
+
+    private final QuestionService service;
+
+    public QuestionController(QuestionService service) {
+        this.service = service;
+    }
 
     @GetMapping
     @Operation(summary = "Obtener los conjuntos de preguntas disponibles")
@@ -35,5 +40,22 @@ public class QuestionController {
     public ResponseEntity<RoundQuestions> getRandomQuestionFromSet(@RequestParam(value = "excludedIds", required = false) List<Integer> excludedIds) {
         // Lógica para obtener una pregunta aleatoria de un conjunto específico, excluyendo las IDs proporcionadas
         return ResponseEntity.ok(new RoundQuestions());
+    }
+
+    @GetMapping("/names")
+    public ResponseEntity<List<QuestionSetNameDTO>> getSetNames() {
+        return ResponseEntity.ok(service.getAllSetNames());
+    }
+
+    @PostMapping("/createSetQuestion")
+    @Operation(summary = "Crea un Set de Preguntas")
+    public ResponseEntity<?> createSetQuestion(@RequestBody QuestionSet questionSet){
+        try{
+            QuestionSet createdSet = service.createQuestionSet(questionSet);
+
+            return ResponseEntity.ok(createdSet);
+        }catch (IllegalArgumentException e){
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
     }
 }
