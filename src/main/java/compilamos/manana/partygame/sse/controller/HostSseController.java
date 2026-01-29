@@ -51,7 +51,7 @@ public class HostSseController {
 
         sseRegistry.getRoomEmitters(roomName).sendToHost(roomName,
                 SseEmitter.event()
-                        .name("SANPSHOT")
+                        .name("HOST_SNAPSHOT")
                         .data(gameService.getHostSnapshot(roomName))
         );
         return emitter;

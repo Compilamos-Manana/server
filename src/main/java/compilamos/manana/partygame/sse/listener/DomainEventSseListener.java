@@ -52,6 +52,7 @@ public class DomainEventSseListener {
                 roomEmitters.sendToHost(roomCode, sseEvent);
                 roomEmitters.sendToPlayers(roomCode, sseEvent);
             }
+            default -> log.warn("Unknown audience type: {}", audience);
         }
 
         if (event.type().equals(DomainEventType.PLAYER_LEFT)) {

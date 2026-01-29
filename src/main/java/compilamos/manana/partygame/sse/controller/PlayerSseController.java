@@ -50,7 +50,7 @@ public class PlayerSseController {
 
         sseRegistry.getRoomEmitters(roomCode).sentToPlayer(playerId,
                 SseEmitter.event()
-                        .name("SANPSHOT")
+                        .name("PLAYER_SNAPSHOT")
                         .data(gameService.getPlayerSnapshot(roomCode, playerId))
         );
 

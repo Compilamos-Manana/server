@@ -16,4 +16,5 @@ public class Player {
     private Boolean isImpostor;
     private PlayerState state;
     private ConnectionState connectionState;
+    private String currentQuestion;
 }

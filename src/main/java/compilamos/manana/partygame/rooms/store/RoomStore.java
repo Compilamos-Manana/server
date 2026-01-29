@@ -6,6 +6,7 @@ import compilamos.manana.partygame.api.exception.ErrorCode;
 import compilamos.manana.partygame.config.GameConfig;
 import compilamos.manana.partygame.game.engine.GameEngine;
 import compilamos.manana.partygame.game.model.GameState;
+import compilamos.manana.partygame.game.question.service.QuestionService;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 
@@ -17,6 +18,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public class RoomStore {
     private final int roomCodeLength = 4;
     private final GameConfig gameConfig;
+    private final QuestionService questionService;
 
     /**
      * key: roomCode
@@ -24,8 +26,9 @@ public class RoomStore {
      */
     ConcurrentHashMap<String, RoomEntry> rooms = new ConcurrentHashMap<>();
 
-    public RoomStore(GameConfig gameConfig) {
+    public RoomStore(GameConfig gameConfig, QuestionService questionService) {
         this.gameConfig = gameConfig;
+        this.questionService = questionService;
     }
 
     public RoomEntry createRoom() {
@@ -39,7 +42,7 @@ public class RoomStore {
         RoomEntry roomEntry  = new RoomEntry(
                 roomCodeStr,
                 gameId,
-                new GameEngine(roomCodeStr, gameId, gameConfig),
+                new GameEngine(roomCodeStr, gameId, gameConfig, questionService),
                 now,
                 now,
                 false

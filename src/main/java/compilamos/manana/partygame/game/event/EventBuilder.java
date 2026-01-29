@@ -8,6 +8,30 @@ import compilamos.manana.partygame.game.model.snapshot.PlayerSnapshot;
 
 public final class EventBuilder {
 
+    public static DomainEvent playerQuestionAssigned(GameContext gameContext, Player player) {
+        return new DomainEvent(
+                DomainEventType.QUESTION_ASSIGNED,
+                metadata(gameContext),
+                player
+        );
+    }
+
+    public static DomainEvent newRoundStarted(GameContext gameContext) {
+        return new DomainEvent(
+                DomainEventType.NEW_ROUND_STARTED,
+                metadata(gameContext),
+                null
+        );
+    }
+
+    public static DomainEvent gameStarted(GameContext ctx) {
+        return new DomainEvent(
+                DomainEventType.GAME_STARTED,
+                metadata(ctx),
+                null
+        );
+    }
+
     public static DomainEvent playerJoined(GameContext ctx, Player player) {
         return new DomainEvent(
                 DomainEventType.PLAYER_JOINED,
@@ -79,6 +103,15 @@ public final class EventBuilder {
         return new EventMetadata(
                 ctx.getRoomCode(),
                 ctx.getGameId(),
+                ctx.getCycleNumber()
+        );
+    }
+
+    private static EventMetadata metadata(GameContext ctx, Player player) {
+        return new EventMetadata(
+                ctx.getRoomCode(),
+                ctx.getGameId(),
+                player.getPlayerId(),
                 ctx.getCycleNumber()
         );
     }

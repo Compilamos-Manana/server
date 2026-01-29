@@ -8,11 +8,15 @@ import compilamos.manana.partygame.game.command.*;
 import compilamos.manana.partygame.game.event.DomainEvent;
 import compilamos.manana.partygame.game.event.EventBuilder;
 import compilamos.manana.partygame.game.model.*;
+import compilamos.manana.partygame.game.model.question.Question;
+import compilamos.manana.partygame.game.model.question.RoundQuestions;
 import compilamos.manana.partygame.game.model.snapshot.PlayerSnapshot;
 import compilamos.manana.partygame.game.model.snapshot.HostSnapshot;
+import compilamos.manana.partygame.game.question.service.QuestionService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
@@ -20,11 +24,13 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 public class GameEngine {
     private final GameContext context;
     private final GameConfig gameConfig;
+    private final QuestionService questionService;
     private final ReentrantReadWriteLock lock = new ReentrantReadWriteLock(true);
 
 
-    public GameEngine(String roomCode, String gameId, GameConfig gameConfig) {
+    public GameEngine(String roomCode, String gameId, GameConfig gameConfig, QuestionService questionService) {
         this.gameConfig = gameConfig;
+        this.questionService = questionService;
         this.context = GameContext.builder()
                 .roomCode(roomCode)
                 .gameId(gameId)
@@ -46,8 +52,20 @@ public class GameEngine {
     public HostSnapshot getHostSnapshot() {
         lock.readLock().lock();
         try {
-            var impostor = context.getImpostorPlayer();
-            impostor = impostor != null ? impostor : new Player("", "", 0, true, null,null);
+            var impostor = context.getPlayers()
+                    .values()
+                    .stream()
+                    .filter(Player::getIsImpostor)
+                    .findFirst()
+                    .orElse(Player.builder().
+                            playerId("N/A").
+                            name("N/A").
+                            avatarId(0).
+                            isImpostor(false).
+                            state(PlayerState.NOT_IN_ROOM).
+                            connectionState(ConnectionState.DISCONNECTED).
+                            currentQuestion("N/A").
+                            build());
 
             return new HostSnapshot(
                     context.getRoomCode(),
@@ -122,6 +140,63 @@ public class GameEngine {
         } finally {
             lock.writeLock().unlock();
         }
+    }
+
+    private List<DomainEvent> handleStartGame(StartGameCommand start) {
+        log.info("Handling StartGame for roomCode: {}", start.roomCode());
+
+        // reglas funcionales:
+        // - Solo se permite en LOBBY.
+        // - Solo si el host está conectado.
+        ensureState(GameState.LOBBY);
+        ensureHostConnected();
+
+        // player count >= minPlayers
+        List<Player> players = context.getPlayers().values().stream().toList();
+        if (players.size() < gameConfig.getRoom().getMinPlayers()) {
+            throw new ApiException(
+                    ErrorCode.VALIDATION_ERROR,
+                    "Not enough players to start the game. Minimum required: " + gameConfig.getRoom().getMinPlayers(),
+                    HttpStatus.BAD_REQUEST
+            );
+        }
+
+        context.setQuestionSetName(start.conjunto());
+
+        players.forEach(p -> {
+            p.setState(PlayerState.ACTIVE);
+            p.setIsImpostor(false);
+        });
+
+        // chose impostor
+        int impostorIndex = (int) (Math.random() * players.size());
+        Player impostor = players.get(impostorIndex);
+        impostor.setIsImpostor(true);
+
+        context.getPlayers().put(impostor.getPlayerId(), impostor);
+
+        // - Cambiar estado del juego a IN_GAME.
+        context.setGameState(GameState.RESPONDIENDO);
+
+        // - Inicializar roundNumber a 1.
+        context.setRoundNumber(1);
+        context.setCycleNumber(1);
+
+        // - Asignar conjunto de preguntas.
+        assignQuestionsToPlayers();
+
+        // - Asignar maxRounds.
+        gameConfig.getRoom().setMaxRounds(start.maxRounds());
+
+        List<DomainEvent> events = new ArrayList<>();
+
+        events.add(EventBuilder.gameStarted(context));
+        events.add(EventBuilder.newRoundStarted(context));
+        players.forEach(p -> {
+            events.add(EventBuilder.playerQuestionAssigned(context, p));
+        });
+        return events;
+
     }
 
     /**
@@ -304,6 +379,7 @@ public class GameEngine {
                 .name(newPlayerName)
                 .avatarId(avatarId)
                 .state(PlayerState.IN_LOBBY)
+                .isImpostor(false)
                 .build();
 
         context.getPlayers().put(newPlayerId, normalized);
@@ -341,11 +417,49 @@ public class GameEngine {
     }
 
 
+    private void assignQuestionsToPlayers() {
+        List<String> excludedQuestions = context.getRoundsQuestionsHistory().stream()
+                .flatMap(rq -> rq.getPreguntas().stream())
+                .map(q -> String.valueOf(q.getId()))
+                .toList();
+        RoundQuestions roundQuestions = questionService.getRandomQuestion(excludedQuestions);
+
+        // pick a random question for players and impostor
+        List<Question> questions = roundQuestions.getPreguntas();
+        int playersQuestionIndex = (int) (Math.random() * questions.size());
+        Question playersQuestion = questions.get(playersQuestionIndex);
+        questions.remove(playersQuestionIndex);
+        int impostorQuestionIndex = (int) (Math.random() * questions.size());
+        Question impostorQuestion = questions.get(impostorQuestionIndex);
+        context.setPlayersQuestion(playersQuestion);
+        context.setImpostorQuestion(impostorQuestion);
+
+        context.getPlayers().values().forEach(p -> {
+           if (p.getIsImpostor()) {
+               p.setCurrentQuestion(impostorQuestion.getPregunta());
+           } else {
+               p.setCurrentQuestion(playersQuestion.getPregunta());
+           }
+        });
+
+        context.getRoundsQuestionsHistory().add(roundQuestions);
+    }
+
     private void ensureState(GameState expected) {
         if (context.getGameState() != expected) {
             throw new ApiException(
                     ErrorCode.INVALID_STATE,
                     "Invalid state. Expected " + expected + " but was " + context.getGameState()
+            );
+        }
+    }
+
+    private void ensureHostConnected() {
+        if (context.getHostConnectionState() != ConnectionState.CONNECTED) {
+            throw new ApiException(
+                    ErrorCode.HOST_DISCONNECTED,
+                    "Host is disconnected",
+                    HttpStatus.BAD_REQUEST
             );
         }
     }

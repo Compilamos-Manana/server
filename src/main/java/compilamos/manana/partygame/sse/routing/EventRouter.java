@@ -8,7 +8,7 @@ public class EventRouter {
     public enum Audience {
         HOST,
         PLAYERS,
-        IMPOSTOR,
+        SPECIFIC_PLAYER,
         ALL
     }
 
@@ -16,6 +16,7 @@ public class EventRouter {
         return switch (event.type()) {
             case PLAYER_JOINED, PLAYER_DISCONNECTED, PLAYER_LEFT, PLAYER_CONNECTED, HOST_SNAPSHOT ->  Audience.HOST;
             case HOST_CONNECTED, HOST_DISCONNECTED ->  Audience.PLAYERS;
+            case PLAYER_SNAPSHOT -> Audience.SPECIFIC_PLAYER;
             default -> Audience.ALL;
         };
     }
