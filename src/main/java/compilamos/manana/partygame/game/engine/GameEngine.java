@@ -422,7 +422,7 @@ public class GameEngine {
                 .flatMap(rq -> rq.getPreguntas().stream())
                 .map(q -> String.valueOf(q.getId()))
                 .toList();
-        RoundQuestions roundQuestions = questionService.getRandomQuestion(excludedQuestions);
+        RoundQuestions roundQuestions = questionService.getRandomQuestion(excludedQuestions,"Pack Test Voluminoso");
 
         // pick a random question for players and impostor
         List<Question> questions = roundQuestions.getPreguntas();

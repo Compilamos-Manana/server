@@ -58,4 +58,11 @@ public class QuestionController {
             return ResponseEntity.badRequest().body(e.getMessage());
         }
     }
-}
+
+        // POST /api/question-sets/next-round?conjunto=Pack%20Marvel
+        @PostMapping("/next-round")
+        public ResponseEntity<?> getNextRound(@RequestParam String conjunto,@RequestBody List<String> historyIds) {
+                RoundQuestions round = service.getRandomQuestion(historyIds,conjunto);
+                return ResponseEntity.ok(round);
+        }
+    }
