@@ -234,8 +234,10 @@ public class GameEngine {
         DomainEvent rondaIniciada = EventBuilder.nuevaRondaIniciada(context);
         events.add(rondaIniciada);
 
+        context.setGameState(GameState.RESPONDIENDO);
+
         context.getPlayers().values().forEach(p -> {
-            p.setState(PlayerState.ASIGNANDO_ROL);
+            p.setState(PlayerState.RESPONDIENDO);
             context.getPlayers().put(p.getPlayerId(), p);
             DomainEvent playerSnapshot = EventBuilder.preguntaAsignada(context, p);
             events.add(playerSnapshot);
