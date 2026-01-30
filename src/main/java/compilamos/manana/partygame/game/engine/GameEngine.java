@@ -141,12 +141,64 @@ public class GameEngine {
                 case StartGameCommand startGameCommand -> handleStartGame(startGameCommand);
                 case CustomEventCommand customEventCommand -> handleCustomEvent(customEventCommand);
                 case NextRoundCommand nextRoundCommand -> handleNextRound(nextRoundCommand);
+                case SendAnswerCommand sendAnswerCommand -> handleSendAnswer(sendAnswerCommand);
                 default -> throw new ApiException(ErrorCode.UNKNOWN_COMMAND,
                         "Unknown command: " + command.getClass().getSimpleName());
             };
         } finally {
             lock.writeLock().unlock();
         }
+    }
+
+    private List<DomainEvent> handleSendAnswer(SendAnswerCommand sendAnswerCommand) {
+        log.info("Handling SendAnswer for playerId: {}", sendAnswerCommand.playerId());
+
+        ensureState(GameState.RESPONDIENDO);
+        ensureHostConnected();
+
+        String playerId = sendAnswerCommand.playerId();
+        Player player = context.getPlayers().get(playerId);
+        if (player == null) {
+            throw new ApiException(
+                    ErrorCode.NOT_FOUND,
+                    "Player not found: " + playerId,
+                    HttpStatus.NOT_FOUND
+            );
+        }
+
+        if (player.getState() != PlayerState.RESPONDIENDO) {
+            throw new ApiException(
+                    ErrorCode.INVALID_STATE,
+                    "Player is not in RESPONDIENDO state: " + player.getState(),
+                    HttpStatus.BAD_REQUEST
+            );
+        }
+
+        // check if player has already answered
+        Answer existingAnswer = context.getCurrentRoundAnswers().stream()
+                .filter(a -> a.getPlayerId().equals(playerId))
+                .findFirst()
+                .orElse(null);
+
+        // if already answered, replace
+
+        if (existingAnswer != null) {
+            context.getCurrentRoundAnswers().remove(existingAnswer);
+        }
+
+        // record answer
+        Answer answer = new Answer(playerId, player.getName(), sendAnswerCommand.answerText());
+        context.getCurrentRoundAnswers().add(answer);
+
+        // update player state
+        player.setState(PlayerState.RESPUESTA_ENVIADA);
+        context.getPlayers().put(playerId, player);
+
+        context.incrementCycleNumber();
+
+        DomainEvent event = EventBuilder.respuestaEnviada(context, player, answer);
+
+        return List.of(event);
     }
 
     private List<DomainEvent> handleNextRound(NextRoundCommand nextRoundCommand) {
@@ -170,6 +222,13 @@ public class GameEngine {
         context.incrementCycleNumber();
 
         assignQuestionsToPlayers();
+
+        var currentRoundsAnswers = context.getCurrentRoundAnswers();
+        if (currentRoundsAnswers == null) currentRoundsAnswers = new ArrayList<>();
+
+        context.getRoundsAnswersHistory().add(new ArrayList<>(currentRoundsAnswers));
+        currentRoundsAnswers.clear();
+
 
         List<DomainEvent> events = new ArrayList<>();
         DomainEvent rondaIniciada = EventBuilder.nuevaRondaIniciada(context);

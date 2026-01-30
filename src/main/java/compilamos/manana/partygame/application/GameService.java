@@ -1,6 +1,7 @@
 package compilamos.manana.partygame.application;
 
 import compilamos.manana.partygame.game.command.NextRoundCommand;
+import compilamos.manana.partygame.game.command.SendAnswerCommand;
 import compilamos.manana.partygame.game.command.StartGameCommand;
 import compilamos.manana.partygame.game.event.DomainEvent;
 import compilamos.manana.partygame.game.event.EventBuilder;
@@ -15,6 +16,15 @@ public class GameService {
     public GameService(RoomLifeCycleService roomLifeCycleService, EventPublisher eventPublisher) {
         this.roomLifeCycleService = roomLifeCycleService;
         this.eventPublisher = eventPublisher;
+    }
+
+    public void sendAnswer(String roomCode, String playerId, String answer) {
+        var gameEngine = roomLifeCycleService.getGameEngine(roomCode);
+
+        var command = new SendAnswerCommand(roomCode, playerId, answer);
+        var events = gameEngine.handle(command);
+
+        events.forEach(eventPublisher::publish);
     }
 
     public void nextRound(String roomCode) {

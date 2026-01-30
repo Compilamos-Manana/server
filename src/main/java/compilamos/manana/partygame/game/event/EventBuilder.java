@@ -1,12 +1,21 @@
 package compilamos.manana.partygame.game.event;
 
 
+import compilamos.manana.partygame.game.model.Answer;
 import compilamos.manana.partygame.game.model.GameContext;
 import compilamos.manana.partygame.game.model.Player;
 import compilamos.manana.partygame.game.model.snapshot.HostSnapshot;
 import compilamos.manana.partygame.game.model.snapshot.PlayerSnapshot;
 
 public final class EventBuilder {
+
+    public static DomainEvent respuestaEnviada(GameContext gameContext, Player player, Answer answer) {
+        return new DomainEvent(
+                DomainEventType.RESPUESTA_ENVIADA,
+                metadata(gameContext, player),
+                answer
+        );
+    }
 
     public static DomainEvent preguntaAsignada(GameContext gameContext, Player player) {
         return new DomainEvent(
