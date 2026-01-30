@@ -9,5 +9,6 @@ public enum ErrorCode {
     ROOM_FULL,
     GAME_PAUSED,
     UNKNOWN_COMMAND,
-    NOT_FOUND
+    NOT_FOUND,
+    HOST_DISCONNECTED
 }

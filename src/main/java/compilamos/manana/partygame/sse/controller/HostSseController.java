@@ -5,6 +5,7 @@ import compilamos.manana.partygame.rooms.lifecycle.RoomLifeCycleService;
 import compilamos.manana.partygame.sse.registry.SseRegistry;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -26,7 +27,7 @@ public class HostSseController {
         this.roomLifeCycleService = roomLifeCycleService;
     }
 
-    @GetMapping()
+    @GetMapping(produces = MediaType.TEXT_EVENT_STREAM_VALUE + ";charset=UTF-8")
     public SseEmitter createRoom(@RequestParam String roomName) {
         SseEmitter emitter = new SseEmitter(0L); // Sin timeout
         sseRegistry.registerHost(roomName, emitter);
@@ -49,10 +50,12 @@ public class HostSseController {
             emitter.completeWithError(e);
         });
 
+        var hostSnapshot = gameService.getHostSnapshot(roomName);
+        log.info("Sending HOST_SNAPSHOT to room {}: {}", roomName, hostSnapshot);
         sseRegistry.getRoomEmitters(roomName).sendToHost(roomName,
                 SseEmitter.event()
-                        .name("SANPSHOT")
-                        .data(gameService.getHostSnapshot(roomName))
+                        .name("HOST_SNAPSHOT")
+                        .data(hostSnapshot, MediaType.APPLICATION_JSON)
         );
         return emitter;
     }

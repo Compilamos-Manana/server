@@ -2,6 +2,7 @@ package compilamos.manana.partygame.game.model.snapshot;
 
 import compilamos.manana.partygame.game.model.ConnectionState;
 import compilamos.manana.partygame.game.model.GameState;
+import compilamos.manana.partygame.game.model.question.Question;
 
 import java.util.List;
 
@@ -14,7 +15,7 @@ public record HostSnapshot(
         int cycleNumber,
         List<PlayerSnapshot> players,
         PlayerSnapshot impostor,
-        String playerQuestion,
-        String impostorQuestion
+        Question playerQuestion,
+        Question impostorQuestion
 ) {
 }

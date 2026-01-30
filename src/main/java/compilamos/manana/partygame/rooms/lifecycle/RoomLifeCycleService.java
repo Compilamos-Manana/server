@@ -7,6 +7,8 @@ import compilamos.manana.partygame.application.EventPublisher;
 import compilamos.manana.partygame.game.command.*;
 import compilamos.manana.partygame.game.engine.GameEngine;
 import compilamos.manana.partygame.game.event.DomainEvent;
+import compilamos.manana.partygame.game.event.DomainEventType;
+import compilamos.manana.partygame.game.event.EventMetadata;
 import compilamos.manana.partygame.game.model.Player;
 import compilamos.manana.partygame.game.model.PlayerState;
 import compilamos.manana.partygame.rooms.store.RoomEntry;
@@ -120,6 +122,18 @@ public class RoomLifeCycleService {
         HostDisconnectCommand hostDisconnectCommand = new HostDisconnectCommand(roomCode);
 
         List<DomainEvent> events = roomEntry.getGameEngine().handle(hostDisconnectCommand);
+
+        eventPublisher.publishAll(events);
+    }
+
+    public void triggerCustomEvent(String roomCode, Object payload) {
+        log.info("RoomLifeCycleService::triggerCustomEvent - roomCode: {}", roomCode);
+
+        var roomEntry = roomStore.requireRoom(roomCode);
+
+        CustomEventCommand customEventCommand = new CustomEventCommand(roomCode, payload);
+
+        List<DomainEvent> events = roomEntry.getGameEngine().handle(customEventCommand);
 
         eventPublisher.publishAll(events);
     }

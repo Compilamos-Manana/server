@@ -1,5 +1,7 @@
 package compilamos.manana.partygame.api.controller;
 
+import compilamos.manana.partygame.api.dto.request.SendAnswerRequest;
+import compilamos.manana.partygame.api.dto.request.StartGameRequest;
 import compilamos.manana.partygame.application.GameService;
 import compilamos.manana.partygame.game.event.DomainEvent;
 import compilamos.manana.partygame.game.model.snapshot.HostSnapshot;
@@ -17,10 +19,25 @@ public class GameController {
         this.gameService = gameService;
     }
 
+    @PostMapping("/{roomCode}/send-answer")
+    public ResponseEntity<Void> sendAnswer(@PathVariable String roomCode, @RequestBody SendAnswerRequest request) {
+        log.info("Request to send answer for room: {}, player: {}", roomCode, request.getPlayerId());
+        gameService.sendAnswer(roomCode, request.getPlayerId(), request.getAnswerText());
+        return ResponseEntity.ok().build();
+    }
+
+                                           @PostMapping("/{roomCode}/next-round")
+    public ResponseEntity<Void> nextRound(@PathVariable String roomCode) {
+        log.info("Request to advance to next round for room: {}", roomCode);
+        gameService.nextRound(roomCode);
+        return ResponseEntity.ok().build();
+    }
+
     @PostMapping("/{roomCode}/start")
-    public void startGame() {
-        log.info("Request to start game received");
-        // Lógica para iniciar el juego en la sala especificada por roomCode
+    public ResponseEntity<Void> startGame(@PathVariable String roomCode, @RequestBody StartGameRequest startGameRequest) {
+        log.info("Request to start game for room: {}", roomCode);
+        gameService.startGame(roomCode, startGameRequest.getConjunto(), startGameRequest.getMaxRounds());
+        return ResponseEntity.ok().build();
     }
 
     @GetMapping("/{roomCode}/host/snapshot")

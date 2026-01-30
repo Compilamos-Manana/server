@@ -8,6 +8,7 @@ import org.springframework.http.HttpStatus;
  */
 public class ErrorResponse {
     private String message;
+    private String trace;
 
     @JsonProperty("error_code")
     private String errorCode;
@@ -19,6 +20,13 @@ public class ErrorResponse {
         this.message = message;
         this.errorCode = errorCode;
         this.statusCode = statusCode.value();
+    }
+
+    public ErrorResponse(String message, String trace, String errorCode, int statusCode) {
+        this.message = message;
+        this.trace = trace;
+        this.errorCode = errorCode;
+        this.statusCode = statusCode;
     }
 
     public String getMessage() {
