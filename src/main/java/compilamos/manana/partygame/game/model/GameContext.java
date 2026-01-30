@@ -6,6 +6,7 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -21,7 +22,9 @@ public class GameContext {
     private int roundNumber;
     private int cycleNumber;
     private final ConcurrentHashMap<String, Player> players = new ConcurrentHashMap<>();
-    List<RoundQuestions> roundsQuestionsHistory;
+    private final List<RoundQuestions> roundsQuestionsHistory = new ArrayList<>();
+    private final List<Answer> currentRoundAnswers = new ArrayList<>();
+    private final List<List<Answer>> roundsAnswersHistory = new ArrayList<>();
     private Question playersQuestion;
     private Question impostorQuestion;
 

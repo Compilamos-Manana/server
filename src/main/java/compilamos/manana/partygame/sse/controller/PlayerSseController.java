@@ -5,6 +5,7 @@ import compilamos.manana.partygame.rooms.lifecycle.RoomLifeCycleService;
 import compilamos.manana.partygame.sse.registry.SseRegistry;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -26,7 +27,7 @@ public class PlayerSseController {
         this.gameService = gameService;
     }
 
-    @GetMapping
+    @GetMapping(produces = MediaType.TEXT_EVENT_STREAM_VALUE + ";charset=UTF-8")
     public SseEmitter joinRoom(@RequestParam String roomCode, @RequestParam String playerId) {
         SseEmitter emmiter = new SseEmitter(0L); // Sin timeout
         roomLifeCycleService.playerConnect(roomCode, playerId);

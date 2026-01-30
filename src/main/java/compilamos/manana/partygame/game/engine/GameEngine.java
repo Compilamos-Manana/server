@@ -55,7 +55,8 @@ public class GameEngine {
             var impostor = context.getPlayers()
                     .values()
                     .stream()
-                    .filter(Player::getIsImpostor)
+                    .filter(java.util.Objects::nonNull)
+                    .filter(Player::isImpostor)
                     .findFirst()
                     .orElse(Player.builder().
                             playerId("N/A").
@@ -64,7 +65,7 @@ public class GameEngine {
                             isImpostor(false).
                             state(PlayerState.NOT_IN_ROOM).
                             connectionState(ConnectionState.DISCONNECTED).
-                            currentQuestion("N/A").
+                            currentQuestion(null).
                             build());
 
             return new HostSnapshot(
@@ -78,17 +79,19 @@ public class GameEngine {
                             p -> new PlayerSnapshot(p.getPlayerId(),
                                     p.getName(),
                                     p.getAvatarId(),
-                                    p.getIsImpostor(),
+                                    p.isImpostor(),
                                     p.getState(),
-                                    p.getConnectionState()
+                                    p.getConnectionState(),
+                                    p.getCurrentQuestion()
                             )).toList(),
                     new PlayerSnapshot(
                             impostor.getPlayerId(),
                             impostor.getName(),
                             impostor.getAvatarId(),
-                            impostor.getIsImpostor(),
+                            impostor.isImpostor(),
                             impostor.getState(),
-                            impostor.getConnectionState()
+                            impostor.getConnectionState(),
+                            impostor.getCurrentQuestion()
                     ),
                     context.getPlayersQuestion(),
                     context.getImpostorQuestion()
@@ -114,9 +117,10 @@ public class GameEngine {
                     player.getPlayerId(),
                     player.getName(),
                     player.getAvatarId(),
-                    player.getIsImpostor(),
+                    player.isImpostor(),
                     player.getState(),
-                    player.getConnectionState()
+                    player.getConnectionState(),
+                    player.getCurrentQuestion()
             ));
 
         } finally {
@@ -134,6 +138,8 @@ public class GameEngine {
                 case PlayerConnectCommand connect -> handlePlayerConnect(connect.playerId());
                 case HostDisconnectCommand disconnect -> handleHostDisconnect(disconnect);
                 case HostConnectCommand connect -> handleHostConnect(connect);
+                case StartGameCommand startGameCommand -> handleStartGame(startGameCommand);
+                case CustomEventCommand customEventCommand -> handleCustomEvent(customEventCommand);
                 default -> throw new ApiException(ErrorCode.UNKNOWN_COMMAND,
                         "Unknown command: " + command.getClass().getSimpleName());
             };
@@ -142,13 +148,58 @@ public class GameEngine {
         }
     }
 
+    private List<DomainEvent> handleNextRound(NextRoundCommand nextRoundCommand) {
+        log.info("Handling NextRound for roomCode: {}", nextRoundCommand.roomCode());
+
+        ensureState(GameState.EMPATE);
+        ensureHostConnected();
+
+        // check if max rounds reached
+        if (context.getRoundNumber() >= gameConfig.getRoom().getMaxRounds()) {
+            log.info("Round number exceeded for roomCode: {}", nextRoundCommand.roomCode());
+            log.error("Max rounds reached: {} >= {}", context.getRoundNumber(), gameConfig.getRoom().getMaxRounds());
+            throw new ApiException(
+                    ErrorCode.VALIDATION_ERROR,
+                    "Max rounds reached: " + context.getRoundNumber() + " >= " + gameConfig.getRoom().getMaxRounds(),
+                    HttpStatus.BAD_REQUEST
+            );
+        }
+
+        context.incrementRoundNumber();
+        context.incrementCycleNumber();
+
+        assignQuestionsToPlayers();
+
+        List<DomainEvent> events = new ArrayList<>();
+        DomainEvent rondaIniciada = EventBuilder.nuevaRondaIniciada(context);
+        events.add(rondaIniciada);
+
+        context.getPlayers().values().forEach(p -> {
+            p.setState(PlayerState.RESPONDIENDO);
+            context.getPlayers().put(p.getPlayerId(), p);
+            DomainEvent playerSnapshot = EventBuilder.preguntaAsignada(context, p);
+            events.add(playerSnapshot);
+        });
+
+        return events;
+    }
+
     private List<DomainEvent> handleStartGame(StartGameCommand start) {
         log.info("Handling StartGame for roomCode: {}", start.roomCode());
 
-        // reglas funcionales:
-        // - Solo se permite en LOBBY.
-        // - Solo si el host está conectado.
-        ensureState(GameState.LOBBY);
+        var conjunto = start.conjunto() != null && !start.conjunto().isEmpty() ? start.conjunto() : context.getQuestionSetName();
+
+        if (conjunto == null || conjunto.isEmpty()) {
+            throw new ApiException(
+                    ErrorCode.VALIDATION_ERROR,
+                    "Question set name cannot be null or empty",
+                    HttpStatus.BAD_REQUEST
+            );
+        }
+
+        var maxRounds = start.maxRounds() > 0 ? start.maxRounds() : gameConfig.getRoom().getMaxRounds();
+
+        ensureState(GameState.LOBBY, GameState.GANA_IMPOSTOR, GameState.GANAN_JUGADORES);
         ensureHostConnected();
 
         // player count >= minPlayers
@@ -161,39 +212,44 @@ public class GameEngine {
             );
         }
 
-        context.setQuestionSetName(start.conjunto());
+        context.setQuestionSetName(conjunto);
 
         players.forEach(p -> {
-            p.setState(PlayerState.ACTIVE);
-            p.setIsImpostor(false);
+            p.setState(PlayerState.ASIGNANDO_ROL);
+            p.setImpostor(false);
+            p.setCurrentQuestion(null);
+            context.getPlayers().put(p.getPlayerId(), p);
         });
 
         // chose impostor
         int impostorIndex = (int) (Math.random() * players.size());
         Player impostor = players.get(impostorIndex);
-        impostor.setIsImpostor(true);
+        impostor.setImpostor(true);
 
         context.getPlayers().put(impostor.getPlayerId(), impostor);
 
         // - Cambiar estado del juego a IN_GAME.
-        context.setGameState(GameState.RESPONDIENDO);
+        context.setGameState(GameState.ASIGNANDO_ROLES);
 
         // - Inicializar roundNumber a 1.
         context.setRoundNumber(1);
         context.setCycleNumber(1);
 
-        // - Asignar conjunto de preguntas.
-        assignQuestionsToPlayers();
+        // - Limpiar preguntas asignadas
+        context.getRoundsQuestionsHistory().clear();
+        context.getCurrentRoundAnswers().clear();
+        context.getRoundsAnswersHistory().clear();
+        context.setPlayersQuestion(null);
+        context.setImpostorQuestion(null);
 
         // - Asignar maxRounds.
         gameConfig.getRoom().setMaxRounds(start.maxRounds());
 
         List<DomainEvent> events = new ArrayList<>();
 
-        events.add(EventBuilder.gameStarted(context));
-        events.add(EventBuilder.newRoundStarted(context));
+        events.add(EventBuilder.partidaIniciada(context));
         players.forEach(p -> {
-            events.add(EventBuilder.playerQuestionAssigned(context, p));
+            events.add(EventBuilder.rolesAsignados(context, p));
         });
         return events;
 
@@ -258,7 +314,10 @@ public class GameEngine {
                 .playerId(player.getPlayerId())
                 .name(player.getName())
                 .avatarId(player.getAvatarId())
-                .state(PlayerState.DISCONNECTED)
+                .isImpostor(player.isImpostor())
+                .connectionState(ConnectionState.DISCONNECTED)
+                .state(player.getState())
+                .currentQuestion(player.getCurrentQuestion())
                 .build();
 
         context.getPlayers().put(playerId, updatedPlayer);
@@ -416,6 +475,14 @@ public class GameEngine {
         return List.of(event);
     }
 
+    private List<DomainEvent> handleCustomEvent(CustomEventCommand customEvent) {
+        log.info("Handling CustomEvent for roomCode: {}", customEvent.roomCode());
+
+        DomainEvent event = EventBuilder.customEvent(context, customEvent.payload());
+
+        return List.of(event);
+    }
+
 
     private void assignQuestionsToPlayers() {
         List<String> excludedQuestions = context.getRoundsQuestionsHistory().stream()
@@ -425,7 +492,7 @@ public class GameEngine {
         RoundQuestions roundQuestions = questionService.getRandomQuestion(excludedQuestions);
 
         // pick a random question for players and impostor
-        List<Question> questions = roundQuestions.getPreguntas();
+        List<Question> questions = new ArrayList<>(roundQuestions.getPreguntas());
         int playersQuestionIndex = (int) (Math.random() * questions.size());
         Question playersQuestion = questions.get(playersQuestionIndex);
         questions.remove(playersQuestionIndex);
@@ -435,14 +502,26 @@ public class GameEngine {
         context.setImpostorQuestion(impostorQuestion);
 
         context.getPlayers().values().forEach(p -> {
-           if (p.getIsImpostor()) {
-               p.setCurrentQuestion(impostorQuestion.getPregunta());
+           if (p.isImpostor()) {
+               p.setCurrentQuestion(impostorQuestion);
            } else {
-               p.setCurrentQuestion(playersQuestion.getPregunta());
+               p.setCurrentQuestion(playersQuestion);
            }
         });
 
         context.getRoundsQuestionsHistory().add(roundQuestions);
+    }
+
+    private void ensureState(GameState... expectedStates) {
+        for (GameState expected : expectedStates) {
+            if (context.getGameState() == expected) {
+                return;
+            }
+        }
+        throw new ApiException(
+                ErrorCode.INVALID_STATE,
+                "Invalid state. Expected one of " + List.of(expectedStates) + " but was " + context.getGameState()
+        );
     }
 
     private void ensureState(GameState expected) {

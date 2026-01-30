@@ -8,25 +8,33 @@ import compilamos.manana.partygame.game.model.snapshot.PlayerSnapshot;
 
 public final class EventBuilder {
 
-    public static DomainEvent playerQuestionAssigned(GameContext gameContext, Player player) {
+    public static DomainEvent preguntaAsignada(GameContext gameContext, Player player) {
         return new DomainEvent(
-                DomainEventType.QUESTION_ASSIGNED,
-                metadata(gameContext),
+                DomainEventType.PREGUNTA_ASIGNADA,
+                metadata(gameContext, player),
                 player
         );
     }
 
-    public static DomainEvent newRoundStarted(GameContext gameContext) {
+    public static DomainEvent rolesAsignados(GameContext gameContext, Player player) {
         return new DomainEvent(
-                DomainEventType.NEW_ROUND_STARTED,
+                DomainEventType.ROLES_ASIGNADOS,
+                metadata(gameContext, player),
+                player
+        );
+    }
+    public static DomainEvent nuevaRondaIniciada(GameContext gameContext) {
+        return new DomainEvent(
+                DomainEventType.RONDA_INICIADA,
                 metadata(gameContext),
                 null
         );
     }
 
-    public static DomainEvent gameStarted(GameContext ctx) {
+
+    public static DomainEvent partidaIniciada(GameContext ctx) {
         return new DomainEvent(
-                DomainEventType.GAME_STARTED,
+                DomainEventType.PARTIDA_INICIADA,
                 metadata(ctx),
                 null
         );
@@ -96,6 +104,14 @@ public final class EventBuilder {
                 DomainEventType.PLAYER_SNAPSHOT,
                 metadata(ctx),
                 snapshot
+        );
+    }
+
+    public static DomainEvent customEvent(GameContext ctx, Object payload) {
+        return new DomainEvent(
+                DomainEventType.FRONTEND_CUSTOM_EVENT,
+                metadata(ctx),
+                payload
         );
     }
 

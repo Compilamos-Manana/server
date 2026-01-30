@@ -15,8 +15,8 @@ public class EventRouter {
     public Audience route(DomainEvent event) {
         return switch (event.type()) {
             case PLAYER_JOINED, PLAYER_DISCONNECTED, PLAYER_LEFT, PLAYER_CONNECTED, HOST_SNAPSHOT ->  Audience.HOST;
-            case HOST_CONNECTED, HOST_DISCONNECTED ->  Audience.PLAYERS;
-            case PLAYER_SNAPSHOT -> Audience.SPECIFIC_PLAYER;
+            case HOST_CONNECTED, HOST_DISCONNECTED, FRONTEND_CUSTOM_EVENT ->  Audience.PLAYERS;
+            case ROLES_ASIGNADOS -> Audience.SPECIFIC_PLAYER;
             default -> Audience.ALL;
         };
     }

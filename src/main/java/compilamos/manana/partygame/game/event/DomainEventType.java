@@ -2,6 +2,9 @@ package compilamos.manana.partygame.game.event;
 
 public enum DomainEventType {
 
+    //Custom event
+    FRONTEND_CUSTOM_EVENT,
+
     // LOBBY / ROOM
     PLAYER_JOINED,
     PLAYER_LEFT,
@@ -13,7 +16,9 @@ public enum DomainEventType {
     PLAYER_SNAPSHOT,
 
     // GAME
-    GAME_STARTED,
-    NEW_ROUND_STARTED,
-    QUESTION_ASSIGNED
+    PARTIDA_INICIADA,
+    ROLES_ASIGNADOS,
+    RONDA_INICIADA,
+    PREGUNTA_ASIGNADA,
+    RESPUESTA_ENVIADA
 }

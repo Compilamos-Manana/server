@@ -2,8 +2,11 @@ package compilamos.manana.partygame.game.model;
 
 public enum GameState {
     LOBBY,
+    ASIGNANDO_ROLES,
     RESPONDIENDO,
-    MOSTRANDO_RESPUESTAS,
+    DEBATIENDO,
     VOTANDO,
-    RESOLVIENDO
+    EMPATE,
+    GANA_IMPOSTOR,
+    GANAN_JUGADORES
 }

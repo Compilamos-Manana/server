@@ -2,6 +2,7 @@ package compilamos.manana.partygame.sse.registry;
 
 import compilamos.manana.partygame.sse.model.EmitterRef;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.MediaType;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.io.IOException;

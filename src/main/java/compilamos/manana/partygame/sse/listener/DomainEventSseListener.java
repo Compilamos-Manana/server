@@ -10,6 +10,7 @@ import compilamos.manana.partygame.sse.routing.EventRouter;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.event.EventListener;
+import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
@@ -34,7 +35,7 @@ public class DomainEventSseListener {
 
         SseEmitter.SseEventBuilder sseEvent = SseEmitter.event()
                 .name(event.type().name())
-                .data(event);
+                .data(event, MediaType.APPLICATION_JSON);
 
         EventRouter.Audience audience = eventRouter.route(event);
 
@@ -51,6 +52,10 @@ public class DomainEventSseListener {
             case ALL -> {
                 roomEmitters.sendToHost(roomCode, sseEvent);
                 roomEmitters.sendToPlayers(roomCode, sseEvent);
+            }
+            case SPECIFIC_PLAYER -> {
+                Player player = (Player) event.payload();
+                roomEmitters.sentToPlayer(player.getPlayerId(), sseEvent);
             }
             default -> log.warn("Unknown audience type: {}", audience);
         }
