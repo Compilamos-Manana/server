@@ -140,6 +140,7 @@ public class GameEngine {
                 case HostConnectCommand connect -> handleHostConnect(connect);
                 case StartGameCommand startGameCommand -> handleStartGame(startGameCommand);
                 case CustomEventCommand customEventCommand -> handleCustomEvent(customEventCommand);
+                case NextRoundCommand nextRoundCommand -> handleNextRound(nextRoundCommand);
                 default -> throw new ApiException(ErrorCode.UNKNOWN_COMMAND,
                         "Unknown command: " + command.getClass().getSimpleName());
             };
