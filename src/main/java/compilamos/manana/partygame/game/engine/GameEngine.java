@@ -204,7 +204,7 @@ public class GameEngine {
     private List<DomainEvent> handleNextRound(NextRoundCommand nextRoundCommand) {
         log.info("Handling NextRound for roomCode: {}", nextRoundCommand.roomCode());
 
-        ensureState(GameState.RESPONDIENDO);
+        ensureState(GameState.EMPATE);
         ensureHostConnected();
 
         // check if max rounds reached
@@ -235,7 +235,7 @@ public class GameEngine {
         events.add(rondaIniciada);
 
         context.getPlayers().values().forEach(p -> {
-            p.setState(PlayerState.RESPONDIENDO);
+            p.setState(PlayerState.ASIGNANDO_ROL);
             context.getPlayers().put(p.getPlayerId(), p);
             DomainEvent playerSnapshot = EventBuilder.preguntaAsignada(context, p);
             events.add(playerSnapshot);
