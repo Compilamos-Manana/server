@@ -474,19 +474,23 @@ public class GameEngine {
 
         context.setQuestionSetName(conjunto);
 
-        players.forEach(p -> {
+        context.getPlayers().replaceAll((id, p) -> {
             p.setState(PlayerState.ASIGNANDO_ROL);
             p.setImpostor(false);
             p.setCurrentQuestion(null);
-            context.getPlayers().put(p.getPlayerId(), p);
+            return p;
         });
+        log.info("Players {} ", context.getPlayers());
 
         // chose impostor
         int impostorIndex = (int) (Math.random() * players.size());
         Player impostor = players.get(impostorIndex);
+        impostor = context.getPlayers().get(impostor.getPlayerId());
         impostor.setImpostor(true);
 
         context.getPlayers().put(impostor.getPlayerId(), impostor);
+        log.info("Impostor chosen: {} ", impostor.getName());
+        log.info("Players {} ", context.getPlayers());
 
         // - Cambiar estado del juego a IN_GAME.
         context.setGameState(GameState.ASIGNANDO_ROLES);
@@ -612,19 +616,13 @@ public class GameEngine {
             );
         }
 
-        Player updatedPlayer = Player.builder()
-                .playerId(player.getPlayerId())
-                .name(player.getName())
-                .avatarId(player.getAvatarId())
-                .state(PlayerState.IN_LOBBY)
-                .connectionState(ConnectionState.CONNECTED)
-                .build();
+        player.setConnectionState(ConnectionState.CONNECTED);
 
-        context.getPlayers().put(playerId, updatedPlayer);
+        context.getPlayers().put(playerId, player);
 
         context.incrementCycleNumber();
 
-        return List.of(EventBuilder.playerConnected(context, updatedPlayer));
+        return List.of(EventBuilder.playerConnected(context, player));
     }
 
     /**
