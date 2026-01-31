@@ -1,6 +1,7 @@
 package compilamos.manana.partygame.api.controller;
 
 import compilamos.manana.partygame.api.dto.request.SendAnswerRequest;
+import compilamos.manana.partygame.api.dto.request.SendVoteRequest;
 import compilamos.manana.partygame.api.dto.request.StartGameRequest;
 import compilamos.manana.partygame.application.GameService;
 import compilamos.manana.partygame.game.event.DomainEvent;
@@ -17,6 +18,34 @@ public class GameController {
 
     public GameController(GameService gameService) {
         this.gameService = gameService;
+    }
+
+    @PostMapping("/{roomCode}/process-round")
+    public ResponseEntity<Void> processRound(@PathVariable String roomCode) {
+        log.info("Request to process round for room: {}", roomCode);
+        gameService.processRound(roomCode);
+        return ResponseEntity.ok().build();
+    }
+
+    @PostMapping("/{roomCode}/send-votes")
+    public ResponseEntity<Void> sendVotes(@PathVariable String roomCode, @RequestBody SendVoteRequest request) {
+        log.info("Request to send votes for room: {}, voteRequest: {}", roomCode, request);
+        gameService.sendVote(roomCode, request.getPlayerId(), request.getVotedPlayerId());
+        return ResponseEntity.ok().build();
+    }
+
+    @PostMapping("/{roomCode}/start-voting")
+    public ResponseEntity<Void> startVoting(@PathVariable String roomCode) {
+        log.info("Request to start voting for room: {}", roomCode);
+        gameService.startVoting(roomCode);
+        return ResponseEntity.ok().build();
+    }
+
+    @PostMapping("/{roomCode}/start-debate")
+    public ResponseEntity<Void> startDebate(@PathVariable String roomCode) {
+        log.info("Request to start debate for room: {}", roomCode);
+        gameService.startDebate(roomCode);
+        return ResponseEntity.ok().build();
     }
 
     @PostMapping("/{roomCode}/send-answer")

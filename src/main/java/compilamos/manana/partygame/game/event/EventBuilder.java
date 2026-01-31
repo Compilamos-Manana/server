@@ -1,13 +1,98 @@
 package compilamos.manana.partygame.game.event;
 
 
-import compilamos.manana.partygame.game.model.Answer;
-import compilamos.manana.partygame.game.model.GameContext;
-import compilamos.manana.partygame.game.model.Player;
+import compilamos.manana.partygame.api.exception.ApiException;
+import compilamos.manana.partygame.api.exception.ErrorCode;
+import compilamos.manana.partygame.game.VoteResult;
+import compilamos.manana.partygame.game.model.*;
 import compilamos.manana.partygame.game.model.snapshot.HostSnapshot;
 import compilamos.manana.partygame.game.model.snapshot.PlayerSnapshot;
+import org.springframework.http.HttpStatus;
+
+import java.util.List;
 
 public final class EventBuilder {
+
+    public static DomainEvent perdedor(GameContext context, Player perdedor) {
+        return new DomainEvent(
+                DomainEventType.PERDISTE,
+                metadata(context, perdedor),
+                perdedor
+        );
+    }
+
+    public static DomainEvent ganador(GameContext context, Player ganador) {
+        return new DomainEvent(
+                DomainEventType.GANASTE,
+                metadata(context, ganador),
+                ganador
+        );
+    }
+
+    public static DomainEvent gananJugadores(GameContext context, Player impostor) {
+        return new DomainEvent(
+                DomainEventType.GANAN_JUGADORES,
+                metadata(context),
+                VoteResult.builder()
+                        .playerIdImpostor(impostor.getPlayerId())
+                        .playerNameImpostor(impostor.getName())
+                        .playerIdVoted(impostor.getPlayerId())
+                        .playerNameVoted(impostor.getName())
+                        .build()
+        );
+    }
+
+    public static DomainEvent ganaImpostor(GameContext context, Player impostor, Player votado) {
+        if (impostor == null) {
+            throw new ApiException(ErrorCode.NOT_FOUND, "Impostor player not found in context", HttpStatus.NOT_FOUND);
+        }
+        var playerIdVoted = votado != null ? votado.getPlayerId() : "";
+        var playerNameVoted = votado != null ? votado.getName() : "";
+
+        return new DomainEvent(
+                DomainEventType.GANA_IMPOSTOR,
+                metadata(context),
+                VoteResult.builder()
+                        .playerIdImpostor(impostor.getPlayerId())
+                        .playerNameImpostor(impostor.getName())
+                        .playerIdVoted(playerIdVoted)
+                        .playerNameVoted(playerNameVoted)
+                        .build()
+        );
+    }
+
+    public static DomainEvent empateDeclarado(GameContext context) {
+        context.setGameState( GameState.EMPATE);
+        return new DomainEvent(
+                DomainEventType.EMPATE,
+                metadata(context),
+                null
+        );
+    }
+
+    public static DomainEvent votoEnviado(GameContext context, Player player, Vote vote) {
+        return new DomainEvent(
+                DomainEventType.VOTO_ENVIADO,
+                metadata(context, player),
+                vote
+        );
+    }
+
+    public static DomainEvent votacionIniciada(GameContext gameContext, List<VoteOption> voteOptions) {
+        return new DomainEvent(
+                DomainEventType.VOTACION_INICIADA,
+                metadata(gameContext),
+                voteOptions
+        );
+    }
+
+    public static DomainEvent debateIniciado(GameContext gameContext, List<Answer> answers) {
+        return new DomainEvent(
+                DomainEventType.DEBATE_INICIADO,
+                metadata(gameContext),
+                answers
+        );
+    }
 
     public static DomainEvent respuestaEnviada(GameContext gameContext, Player player, Answer answer) {
         return new DomainEvent(

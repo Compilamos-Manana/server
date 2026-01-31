@@ -25,6 +25,8 @@ public class GameContext {
     private final List<RoundQuestions> roundsQuestionsHistory = new ArrayList<>();
     private final List<Answer> currentRoundAnswers = new ArrayList<>();
     private final List<List<Answer>> roundsAnswersHistory = new ArrayList<>();
+    private final List<Vote> currentRoundVotes = new ArrayList<>();
+    private final List<List<Vote>> roundsVotesHistory = new ArrayList<>();
     private Question playersQuestion;
     private Question impostorQuestion;
 

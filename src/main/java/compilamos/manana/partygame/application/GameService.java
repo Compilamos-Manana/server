@@ -1,8 +1,6 @@
 package compilamos.manana.partygame.application;
 
-import compilamos.manana.partygame.game.command.NextRoundCommand;
-import compilamos.manana.partygame.game.command.SendAnswerCommand;
-import compilamos.manana.partygame.game.command.StartGameCommand;
+import compilamos.manana.partygame.game.command.*;
 import compilamos.manana.partygame.game.event.DomainEvent;
 import compilamos.manana.partygame.game.event.EventBuilder;
 import compilamos.manana.partygame.rooms.lifecycle.RoomLifeCycleService;
@@ -16,6 +14,36 @@ public class GameService {
     public GameService(RoomLifeCycleService roomLifeCycleService, EventPublisher eventPublisher) {
         this.roomLifeCycleService = roomLifeCycleService;
         this.eventPublisher = eventPublisher;
+    }
+
+    public void processRound(String roomCode) {
+        var gameEngine = roomLifeCycleService.getGameEngine(roomCode);
+        var command = new ProcessRoundCommand(roomCode);
+        var events = gameEngine.handle(command);
+        events.forEach(eventPublisher::publish);
+    }
+
+    public void sendVote(String roomCode, String playerId, String votedPlayerId) {
+        var gameEngine = roomLifeCycleService.getGameEngine(roomCode);
+
+        var command = new SendVoteCommand(roomCode, playerId, votedPlayerId);
+        var events = gameEngine.handle(command);
+
+        events.forEach(eventPublisher::publish);
+    }
+
+    public void startVoting(String roomCode) {
+        var gameEngine = roomLifeCycleService.getGameEngine(roomCode);
+        var command = new StartVotingCommand(roomCode);
+        var events = gameEngine.handle(command);
+        events.forEach(eventPublisher::publish);
+    }
+
+    public void startDebate(String roomCode) {
+        var gameEngine = roomLifeCycleService.getGameEngine(roomCode);
+        var command = new StartDebateCommand(roomCode);
+        var events = gameEngine.handle(command);
+        events.forEach(eventPublisher::publish);
     }
 
     public void sendAnswer(String roomCode, String playerId, String answer) {

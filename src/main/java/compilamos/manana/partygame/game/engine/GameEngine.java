@@ -17,7 +17,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 @Slf4j
@@ -82,7 +84,8 @@ public class GameEngine {
                                     p.isImpostor(),
                                     p.getState(),
                                     p.getConnectionState(),
-                                    p.getCurrentQuestion()
+                                    p.getCurrentQuestion(),
+                                    getVoteOptions()
                             )).toList(),
                     new PlayerSnapshot(
                             impostor.getPlayerId(),
@@ -91,7 +94,8 @@ public class GameEngine {
                             impostor.isImpostor(),
                             impostor.getState(),
                             impostor.getConnectionState(),
-                            impostor.getCurrentQuestion()
+                            impostor.getCurrentQuestion(),
+                            getVoteOptions()
                     ),
                     context.getPlayersQuestion(),
                     context.getImpostorQuestion()
@@ -120,7 +124,8 @@ public class GameEngine {
                     player.isImpostor(),
                     player.getState(),
                     player.getConnectionState(),
-                    player.getCurrentQuestion()
+                    player.getCurrentQuestion(),
+                    getVoteOptions()
             ));
 
         } finally {
@@ -142,12 +147,195 @@ public class GameEngine {
                 case CustomEventCommand customEventCommand -> handleCustomEvent(customEventCommand);
                 case NextRoundCommand nextRoundCommand -> handleNextRound(nextRoundCommand);
                 case SendAnswerCommand sendAnswerCommand -> handleSendAnswer(sendAnswerCommand);
+                case StartDebateCommand startDebateCommand -> handleStartDebate(startDebateCommand);
+                case StartVotingCommand startVotingCommand -> handleStartVoting(startVotingCommand);
+                case SendVoteCommand sendVoteCommand -> handleSendVote(sendVoteCommand);
+                case ProcessRoundCommand processRoundCommand -> handleProcessRound(processRoundCommand);
                 default -> throw new ApiException(ErrorCode.UNKNOWN_COMMAND,
                         "Unknown command: " + command.getClass().getSimpleName());
             };
         } finally {
             lock.writeLock().unlock();
         }
+    }
+
+    private List<DomainEvent> handleProcessRound(ProcessRoundCommand processRoundCommand) {
+        log.info("Handling ProcessRound for roomCode: {}", processRoundCommand.roomCode());
+
+        ensureState(GameState.VOTANDO);
+        ensureHostConnected();
+
+        // Se gana por mayoria simple
+        var currentVotes = context.getCurrentRoundVotes();
+        var playerCount = context.getPlayers().size();
+        var skipVotes = 0;
+        Map<String, Integer> playerVoteCount = new HashMap<>();
+
+        // Count votes
+        for (Vote vote : currentVotes) {
+            var playerIdVoted = vote.getVotedPlayerId();
+            playerIdVoted = (playerIdVoted != null && !playerIdVoted.isEmpty()) ? playerIdVoted : "fafa";
+            var playerVoted = context.getPlayers().get(playerIdVoted);
+            if (playerVoted == null || playerIdVoted.equals("SKIP")) {
+                skipVotes++;
+            } else {
+                playerVoteCount.put(playerIdVoted, playerVoteCount.getOrDefault(playerIdVoted, 0) + 1);
+            }
+        }
+
+        // Jugador más votado (si hay empate, nadie es eliminado)
+        String eliminatedPlayerId = null;
+        int maxVotes = 0;
+        boolean tie = false;
+
+        for (Map.Entry<String, Integer> entry : playerVoteCount.entrySet()) {
+            if (entry.getValue() > maxVotes) {
+                maxVotes = entry.getValue();
+                eliminatedPlayerId = entry.getKey();
+                tie = false;
+            } else if (entry.getValue() == maxVotes) {
+                tie = true;
+            }
+        }
+
+        List<DomainEvent> events = new ArrayList<>();
+
+        var impostor = context.getPlayers()
+                .values()
+                .stream()
+                .filter(java.util.Objects::nonNull)
+                .filter(Player::isImpostor)
+                .findFirst()
+                .orElseThrow(() -> new ApiException(
+                        ErrorCode.NOT_FOUND,
+                        "Impostor not found",
+                        HttpStatus.NOT_FOUND
+                ));
+
+        if (tie || maxVotes <= skipVotes) {
+            // Empate o más votos en SKIP, nadie es eliminado
+            if (gameConfig.getRoom().getMaxRounds() == context.getRoundNumber()) {
+                events.addAll(impostorWins(impostor, null));
+            } else {
+                // Continuar a la siguiente ronda
+                events.add(EventBuilder.empateDeclarado(context));
+            }
+        } else {
+            // Eliminar jugador
+            Player eliminatedPlayer = context.getPlayers().get(eliminatedPlayerId);
+            if (eliminatedPlayer != null) {
+                var isImpostor = eliminatedPlayer.isImpostor();
+                if (isImpostor) {
+                    events.addAll(playersWin(impostor, eliminatedPlayer));
+                } else {
+                    events.addAll(impostorWins(impostor, eliminatedPlayer));
+                }
+            } else {
+                throw new ApiException(
+                        ErrorCode.NOT_FOUND,
+                        "Eliminated player not found: " + eliminatedPlayerId,
+                        HttpStatus.NOT_FOUND
+                );
+            }
+        }
+
+        return events;
+    }
+
+    private List<DomainEvent> handleSendVote(SendVoteCommand sendVoteCommand) {
+        log.info("Handling SendVote for playerId: {}", sendVoteCommand.playerId());
+
+        ensureState(GameState.VOTANDO);
+        ensureHostConnected();
+
+        String playerIdVoter = sendVoteCommand.playerId();
+        Player playerVoter = context.getPlayers().get(playerIdVoter);
+
+        if (playerVoter == null) {
+            throw new ApiException(
+                    ErrorCode.NOT_FOUND,
+                    "Player not found: " + playerIdVoter,
+                    HttpStatus.NOT_FOUND
+            );
+        }
+
+        if (playerVoter.getState() != PlayerState.VOTANDO) {
+            throw new ApiException(
+                    ErrorCode.INVALID_STATE,
+                    "Player is not in VOTANDO state: " + playerVoter.getState(),
+                    HttpStatus.BAD_REQUEST
+            );
+        }
+
+        String votedPlayerId = sendVoteCommand.votedPlayerId();
+        votedPlayerId = (votedPlayerId != null && !votedPlayerId.isEmpty()) ? votedPlayerId : "fafa";
+
+        Player votedPlayer = context.getPlayers().get(votedPlayerId);
+        Vote vote;
+        if (votedPlayer == null) {
+            vote = Vote.builder().
+                    playerId(playerIdVoter).
+                    playerName(playerVoter.getName()).
+                    votedPlayerId("SKIP")
+                    .votedPlayerName("SKIP").
+                    build();
+        } else {
+            vote = Vote.builder().
+                    playerId(playerIdVoter).
+                    playerName(playerVoter.getName()).
+                    votedPlayerId(votedPlayerId)
+                    .votedPlayerName(votedPlayer.getName()).
+                    build();
+        }
+
+        // record vote
+        context.getCurrentRoundVotes().add(vote);
+        playerVoter.setState(PlayerState.VOTO_ENVIADO);
+        context.getPlayers().put(playerIdVoter, playerVoter);
+
+        context.incrementCycleNumber();
+
+        DomainEvent event = EventBuilder.votoEnviado(context, playerVoter, vote);
+
+        return List.of(event);
+    }
+
+    private List<DomainEvent> handleStartVoting(StartVotingCommand startVotingCommand) {
+        log.info("Handling StartVoting for roomCode: {}", startVotingCommand.roomCode());
+
+        ensureState(GameState.DEBATIENDO);
+        ensureHostConnected();
+
+        context.setGameState(GameState.VOTANDO);
+        context.incrementCycleNumber();
+
+        context.getPlayers().values().forEach(p -> {
+            p.setState(PlayerState.VOTANDO);
+            context.getPlayers().put(p.getPlayerId(), p);
+        });
+
+        DomainEvent event = EventBuilder.votacionIniciada(context, getVoteOptions());
+
+        return List.of(event);
+    }
+
+    private List<DomainEvent> handleStartDebate(StartDebateCommand startDebateCommand) {
+        log.info("Handling StartDebate for roomCode: {}", startDebateCommand.roomCode());
+
+        ensureState(GameState.RESPONDIENDO);
+        ensureHostConnected();
+
+        context.setGameState(GameState.DEBATIENDO);
+        context.incrementCycleNumber();
+
+        context.getPlayers().values().forEach(p -> {
+            p.setState(PlayerState.DEBATIENDO);
+            context.getPlayers().put(p.getPlayerId(), p);
+        });
+
+        DomainEvent event = EventBuilder.debateIniciado(context, context.getCurrentRoundAnswers());
+
+        return List.of(event);
     }
 
     private List<DomainEvent> handleSendAnswer(SendAnswerCommand sendAnswerCommand) {
@@ -221,13 +409,23 @@ public class GameEngine {
         context.incrementRoundNumber();
         context.incrementCycleNumber();
 
+        // Limpiar respuestas y votos de la ronda anterior
+        var currentRoundsVotes = context.getCurrentRoundVotes();
+        currentRoundsVotes = currentRoundsVotes == null ? new ArrayList<>() : currentRoundsVotes;
+        if (!currentRoundsVotes.isEmpty()) context.getRoundsVotesHistory().add(new ArrayList<>(currentRoundsVotes));
+        currentRoundsVotes.clear();
+
+        context.setImpostorQuestion(null);
+        context.setPlayersQuestion(null);
+
+        var currentAnswers = context.getCurrentRoundAnswers();
+        currentAnswers = currentAnswers == null ? new ArrayList<>() : currentAnswers;
+        if (!currentAnswers.isEmpty()) context.getRoundsAnswersHistory().add(new ArrayList<>(currentAnswers));
+        currentAnswers.clear();
+
+
+
         assignQuestionsToPlayers();
-
-        var currentRoundsAnswers = context.getCurrentRoundAnswers();
-        if (currentRoundsAnswers == null) currentRoundsAnswers = new ArrayList<>();
-
-        context.getRoundsAnswersHistory().add(new ArrayList<>(currentRoundsAnswers));
-        currentRoundsAnswers.clear();
 
 
         List<DomainEvent> events = new ArrayList<>();
@@ -303,6 +501,14 @@ public class GameEngine {
         context.getRoundsAnswersHistory().clear();
         context.setPlayersQuestion(null);
         context.setImpostorQuestion(null);
+
+        // - Limpiar respuestas
+        context.getCurrentRoundAnswers().clear();
+        context.getRoundsAnswersHistory().clear();
+
+        // - Limpiar votos
+        context.getCurrentRoundVotes().clear();
+        context.getRoundsVotesHistory().clear();
 
         // - Asignar maxRounds.
         gameConfig.getRoom().setMaxRounds(start.maxRounds());
@@ -545,6 +751,95 @@ public class GameEngine {
         return List.of(event);
     }
 
+    private List<DomainEvent> playersWin(Player playerImpostor, Player playerEliminated) {
+        log.info("Players win in roomCode: {}", context.getRoomCode());
+
+        ensureState(GameState.VOTANDO);
+        ensureHostConnected();
+
+        context.setGameState(GameState.GANAN_JUGADORES);
+
+        var impostor = context.getPlayers()
+                .values()
+                .stream()
+                .filter(java.util.Objects::nonNull)
+                .filter(Player::isImpostor)
+                .findFirst()
+                .orElseThrow(() -> new ApiException(
+                        ErrorCode.NOT_FOUND,
+                        "Impostor not found",
+                        HttpStatus.NOT_FOUND
+                ));
+        impostor.setState(PlayerState.PERDEDOR);
+        context.getPlayers().put(impostor.getPlayerId(), impostor);
+
+        context.getPlayers().values().forEach(p -> {
+            if (!p.isImpostor()) {
+                p.setState(PlayerState.GANADOR);
+                context.getPlayers().put(p.getPlayerId(), p);
+            }
+        });
+
+        List<DomainEvent> events = new ArrayList<>();
+
+        DomainEvent event = EventBuilder.gananJugadores(context, impostor);
+        events.add(event);
+
+        context.getPlayers().values().forEach(p -> {
+            if (p.isImpostor()) {
+                events.add(EventBuilder.perdedor(context, p));
+            } else {
+                events.add(EventBuilder.ganador(context, p));
+            }
+        });
+
+        return events;
+    }
+
+    private List<DomainEvent> impostorWins(Player playerImpostor, Player playerEliminated) {
+        log.info("Impostor wins in roomCode: {}", context.getRoomCode());
+
+        ensureState(GameState.VOTANDO);
+        ensureHostConnected();
+
+        context.setGameState(GameState.GANA_IMPOSTOR);
+
+        var impostor = context.getPlayers()
+                .values()
+                .stream()
+                .filter(java.util.Objects::nonNull)
+                .filter(Player::isImpostor)
+                .findFirst()
+                .orElseThrow(() -> new ApiException(
+                        ErrorCode.NOT_FOUND,
+                        "Impostor not found",
+                        HttpStatus.NOT_FOUND
+                ));
+        impostor.setState(PlayerState.GANADOR);
+        context.getPlayers().put(impostor.getPlayerId(), impostor);
+
+        context.getPlayers().values().forEach(p -> {
+            if (!p.isImpostor()) {
+                p.setState(PlayerState.PERDEDOR);
+                context.getPlayers().put(p.getPlayerId(), p);
+            }
+        });
+
+        List<DomainEvent> events = new ArrayList<>();
+
+        DomainEvent event = EventBuilder.ganaImpostor(context, impostor, playerEliminated);
+        events.add(event);
+
+        context.getPlayers().values().forEach(p -> {
+            if (p.isImpostor()) {
+                events.add(EventBuilder.ganador(context, p));
+            } else {
+                events.add(EventBuilder.perdedor(context, p));
+            }
+        });
+
+        return events;
+    }
 
     private void assignQuestionsToPlayers() {
         List<String> excludedQuestions = context.getRoundsQuestionsHistory().stream()
@@ -603,6 +898,12 @@ public class GameEngine {
                     HttpStatus.BAD_REQUEST
             );
         }
+    }
+
+    private List<VoteOption> getVoteOptions() {
+        return context.getPlayers().values().stream()
+                .map(p -> new VoteOption(p.getPlayerId(), p.getName()))
+                .toList();
     }
 
 }
