@@ -58,9 +58,9 @@ jobs:
           echo "MONGODB_USERNAME=$MONGODB_USERNAME" >> /home/ec2-user/env/discordbot.conf &&
           echo "MONGODB_PASSWORD=$MONGODB_PASSWORD" >> /home/ec2-user/env/discordbot.conf &&
           echo "MONGODB_DATABASE=$MONGODB_DATABASE" >> /home/ec2-user/env/discordbot.conf &&
-          echo "Stop discordbot.service" &&
+          echo "Stop partygame.service" &&
           ls &&
           sudo systemctl stop partygame.service &&
-          echo "Init discordbot.service" &&
+          echo "Init partygame.service" &&
           sudo systemctl start partygame.service
           ls -al
