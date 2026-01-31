@@ -53,7 +53,7 @@ jobs:
           export MONGODB_USERNAME=${{ secrets.MONGODB_USERNAME }} &&
           export MONGODB_PASSWORD=${{ secrets.MONGODB_PASSWORD }} &&
           export MONGODB_DATABASE=${{ secrets.MONGODB_DATABASE }} &&
-          echo '' > /home/ec2-user/env/discordbot.conf &&
+          echo '' > /home/ec2-user/env/partygame.conf &&
           echo "MONGODB_CLUSTER=$MONGODB_CLUSTER" >> /home/ec2-user/env/discordbot.conf &&
           echo "MONGODB_USERNAME=$MONGODB_USERNAME" >> /home/ec2-user/env/discordbot.conf &&
           echo "MONGODB_PASSWORD=$MONGODB_PASSWORD" >> /home/ec2-user/env/discordbot.conf &&
