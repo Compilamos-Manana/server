@@ -28,6 +28,7 @@ public class GameEngine {
     private final GameConfig gameConfig;
     private final QuestionService questionService;
     private final ReentrantReadWriteLock lock = new ReentrantReadWriteLock(true);
+    private final List<Integer> usedAvatarIds = new ArrayList<>();
 
 
     public GameEngine(String roomCode, String gameId, GameConfig gameConfig, QuestionService questionService) {
@@ -715,11 +716,23 @@ public class GameEngine {
             }
         }
 
+        // Get random unused avatarId
+        Integer randomAvatarId = 1;
+        List<Integer> validAvatarIds = gameConfig.getValidAvatarIds();
+        List<Integer> availableAvatarIds = new ArrayList<>(validAvatarIds);
+        availableAvatarIds.removeAll(usedAvatarIds);
+        if (!availableAvatarIds.isEmpty()) {
+            int randomIndex = (int) (Math.random() * availableAvatarIds.size());
+            randomAvatarId = availableAvatarIds.get(randomIndex);
+            usedAvatarIds.add(randomAvatarId);
+            avatarId = randomAvatarId;
+        }
+
         // normalize new player state
         Player normalized = Player.builder()
                 .playerId(newPlayerId)
                 .name(newPlayerName)
-                .avatarId(avatarId)
+                .avatarId(randomAvatarId)
                 .state(PlayerState.IN_LOBBY)
                 .isImpostor(false)
                 .build();

@@ -23,6 +23,10 @@ public class GameConfig {
         return avatars != null && avatars.getValidIds() != null && avatars.getValidIds().contains(avatarId);
     }
 
+    public List<Integer> getValidAvatarIds() {
+        return avatars != null ? avatars.getValidIds() : List.of();
+    }
+
     @Data
     public static class AvatarConfig {
         private List<Integer> validIds;
