@@ -1,5 +1,6 @@
 package compilamos.manana.partygame.game.model.snapshot;
 
+import compilamos.manana.partygame.game.model.Answer;
 import compilamos.manana.partygame.game.model.ConnectionState;
 import compilamos.manana.partygame.game.model.PlayerState;
 import compilamos.manana.partygame.game.model.VoteOption;
@@ -15,6 +16,7 @@ public record PlayerSnapshot(
         PlayerState state,
         ConnectionState connectionState,
         Question currentQuestion,
-        List<VoteOption> voteOptions
+        List<VoteOption> voteOptions,
+        Answer currentAnswer
 ) {
 }

@@ -73,6 +73,7 @@ public class GameEngine {
             return new HostSnapshot(
                     context.getRoomCode(),
                     context.getGameId(),
+                    context.getQuestionSetName(),
                     context.getGameState(),
                     context.getHostConnectionState(),
                     0,
@@ -85,8 +86,12 @@ public class GameEngine {
                                     p.getState(),
                                     p.getConnectionState(),
                                     p.getCurrentQuestion(),
-                                    getVoteOptions()
-                            )).toList(),
+                                    getVoteOptions(),
+                                    context.getCurrentRoundAnswers().stream()
+                                            .filter(a -> a.getPlayerId().equals(p.getPlayerId()))
+                                            .findFirst()
+                                            .orElse(null
+                            ))).toList(),
                     new PlayerSnapshot(
                             impostor.getPlayerId(),
                             impostor.getName(),
@@ -95,10 +100,18 @@ public class GameEngine {
                             impostor.getState(),
                             impostor.getConnectionState(),
                             impostor.getCurrentQuestion(),
-                            getVoteOptions()
-                    ),
+                            getVoteOptions(),
+                            context.getCurrentRoundAnswers().stream()
+                                    .filter(a -> a.getPlayerId().equals(impostor.getPlayerId()))
+                                    .findFirst()
+                                    .orElse(null)),
                     context.getPlayersQuestion(),
-                    context.getImpostorQuestion()
+                    context.getImpostorQuestion(),
+                    context.getRoundsQuestionsHistory(),
+                    context.getCurrentRoundAnswers(),
+                    context.getRoundsAnswersHistory(),
+                    context.getCurrentRoundVotes(),
+                    context.getRoundsVotesHistory()
             );
         } finally {
             lock.readLock().unlock();
@@ -125,7 +138,11 @@ public class GameEngine {
                     player.getState(),
                     player.getConnectionState(),
                     player.getCurrentQuestion(),
-                    getVoteOptions()
+                    getVoteOptions(),
+                    context.getCurrentRoundAnswers().stream()
+                            .filter(a -> a.getPlayerId().equals(player.getPlayerId()))
+                            .findFirst()
+                            .orElse(null)
             ));
 
         } finally {
