@@ -14,7 +14,7 @@ public class WebConfig {
     @Bean
     public CorsFilter corsFilter() {
         CorsConfiguration config = new CorsConfiguration();
-        config.setAllowedOrigins(Arrays.asList("http://localhost:4200", "https://lihuelmujica.github.io"));
+        config.setAllowedOrigins(Arrays.asList("http://localhost:4200", "https://lihuelmujica.github.io", "https://caretas.up.railway.app"));
         config.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(Arrays.asList("Content-Type", "Authorization"));
         config.setAllowCredentials(true);
