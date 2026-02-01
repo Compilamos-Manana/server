@@ -7,6 +7,7 @@ import compilamos.manana.partygame.config.GameConfig;
 import compilamos.manana.partygame.game.engine.GameEngine;
 import compilamos.manana.partygame.game.model.GameState;
 import compilamos.manana.partygame.game.question.service.QuestionService;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 
@@ -15,6 +16,7 @@ import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Component
+@Slf4j
 public class RoomStore {
     private final int roomCodeLength = 4;
     private final GameConfig gameConfig;
@@ -58,6 +60,7 @@ public class RoomStore {
 
     public RoomEntry requireRoom(String roomCode) {
         RoomEntry roomEntry = rooms.get(roomCode);
+        touchRoom(roomCode);
         if (roomEntry == null) {
             throw new ApiException(ErrorCode.VALIDATION_ERROR, "Room code not found: " + roomCode, HttpStatus.NOT_FOUND);
         }
@@ -65,6 +68,7 @@ public class RoomStore {
     }
 
     public void touchRoom(String roomCode) {
+        log.info("Touching room: {}", roomCode);
         RoomEntry roomEntry = requireRoom(roomCode);
         roomEntry.setLastTocuhedAt(Instant.now());
     }
