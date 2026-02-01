@@ -513,7 +513,7 @@ public class GameEngine {
         context.setGameState(GameState.ASIGNANDO_ROLES);
 
         // - Inicializar roundNumber a 1.
-        context.setRoundNumber(1);
+        context.setRoundNumber(0);
         context.setCycleNumber(1);
 
         // - Limpiar preguntas asignadas
