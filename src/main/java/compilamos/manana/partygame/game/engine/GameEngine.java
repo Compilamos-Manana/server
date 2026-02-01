@@ -76,8 +76,8 @@ public class GameEngine {
                     context.getQuestionSetName(),
                     context.getGameState(),
                     context.getHostConnectionState(),
-                    0,
-                    0,
+                    context.getRoundNumber(),
+                    context.getCycleNumber(),
                     context.getPlayers().values().stream().map(
                             p -> new PlayerSnapshot(p.getPlayerId(),
                                     p.getName(),
